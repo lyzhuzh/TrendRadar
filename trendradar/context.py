@@ -374,6 +374,7 @@ class AppContext:
         mode: str = "daily",
         rss_items: Optional[list] = None,
         rss_new_items: Optional[list] = None,
+        ai_summary: Optional[str] = None,
     ) -> List[str]:
         """分批处理消息内容（支持热榜+RSS合并）
 
@@ -385,6 +386,7 @@ class AppContext:
             mode: 报告模式
             rss_items: RSS 统计条目列表
             rss_new_items: RSS 新增条目列表
+            ai_summary: AI 总结内容
 
         Returns:
             分批后的消息内容列表
@@ -405,6 +407,7 @@ class AppContext:
             get_time_func=self.get_time,
             rss_items=rss_items,
             rss_new_items=rss_new_items,
+            ai_summary=ai_summary,
             timezone=self.config.get("TIMEZONE", "Asia/Shanghai"),
             display_mode=self.display_mode,
         )
