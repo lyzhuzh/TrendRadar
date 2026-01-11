@@ -26,8 +26,6 @@ app:
 platforms:
   - id: "toutiao"
     name: "今日头条"
-  - id: "xueqiu"
-    name: "雪球"
   - id: "wallstreetcn-hot"
     name: "华尔街见闻"
   - id: "thepaper"
