@@ -36,18 +36,17 @@ def send_ai_notification(summary_file: str) -> bool:
 
     # 加载配置
     config = load_config()
-    notification_config = config.get("NOTIFICATION", {})
 
-    # 检查是否配置了通知渠道
+    # 检查是否配置了通知渠道（webhook URL 在配置顶层）
     has_any_channel = any([
-        notification_config.get("FEISHU_WEBHOOK_URL"),
-        notification_config.get("DINGTALK_WEBHOOK_URL"),
-        notification_config.get("TELEGRAM_BOT_TOKEN") and notification_config.get("TELEGRAM_CHAT_ID"),
-        notification_config.get("WEWORK_WEBHOOK_URL"),
-        notification_config.get("EMAIL_TO"),
-        notification_config.get("NTFY_SERVER_URL"),
-        notification_config.get("BARK_URL"),
-        notification_config.get("SLACK_WEBHOOK_URL"),
+        config.get("FEISHU_WEBHOOK_URL"),
+        config.get("DINGTALK_WEBHOOK_URL"),
+        config.get("TELEGRAM_BOT_TOKEN") and config.get("TELEGRAM_CHAT_ID"),
+        config.get("WEWORK_WEBHOOK_URL"),
+        config.get("EMAIL_TO"),
+        config.get("NTFY_SERVER_URL") and config.get("NTFY_TOPIC"),
+        config.get("BARK_URL"),
+        config.get("SLACK_WEBHOOK_URL"),
     ])
 
     if not has_any_channel:
