@@ -35,6 +35,7 @@ def split_content_into_batches(
     rss_new_items: Optional[list] = None,
     timezone: str = "Asia/Shanghai",
     display_mode: str = "keyword",
+    ai_summary: Optional[str] = None,
 ) -> List[str]:
     """分批处理消息内容，确保词组标题+至少第一条新闻的完整性（支持热榜+RSS合并）
 
@@ -55,6 +56,7 @@ def split_content_into_batches(
         rss_new_items: RSS 新增条目列表（可选，用于新增区块）
         timezone: 时区名称（用于 RSS 时间格式化）
         display_mode: 显示模式 (keyword=按关键词分组, platform=按平台分组)
+        ai_summary: AI 总结内容（可选）
 
     Returns:
         分批后的消息内容列表
@@ -141,6 +143,33 @@ def split_content_into_batches(
 
     current_batch = base_header
     current_batch_has_content = False
+
+    # 添加 AI 总结（如果有）
+    if ai_summary:
+        ai_header = ""
+        ai_separator = "━━━━━━━━━━━━"
+        if format_type == "feishu":
+            ai_header = f"{ai_separator}\n\n🤖 **AI 每日摘要**\n\n{ai_summary}\n"
+        elif format_type in ("dingtalk", "wework", "bark", "ntfy"):
+            ai_header = f"{ai_separator}\n\n🤖 **AI 每日摘要**\n\n{ai_summary}\n"
+        elif format_type == "telegram":
+            ai_header = f"{ai_separator}\n\n🤖 AI 每日摘要\n\n{ai_summary}\n"
+        elif format_type == "slack":
+            ai_header = f"{ai_separator}\n\n🤖 *AI 每日摘要*\n\n{ai_summary}\n"
+
+        # 检查 AI 总结是否能放入当前批次
+        test_content = current_batch + ai_header
+        if (
+            len(test_content.encode("utf-8")) + len(base_footer.encode("utf-8"))
+            < max_bytes
+        ):
+            current_batch = test_content
+            current_batch_has_content = True
+        else:
+            if current_batch_has_content:
+                batches.append(current_batch + base_footer)
+            current_batch = base_header + ai_header
+            current_batch_has_content = True
 
     if (
         not report_data["stats"]

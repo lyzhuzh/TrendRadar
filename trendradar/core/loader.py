@@ -3,6 +3,7 @@
 配置加载模块
 
 负责从 YAML 配置文件和环境变量加载配置。
+支持从 .env 文件加载环境变量。
 """
 
 import os
@@ -10,8 +11,35 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 import yaml
+from dotenv import load_dotenv
 
 from .config import parse_multi_account_config, validate_paired_configs
+
+
+def _load_env_file():
+    """
+    加载 .env 文件（如果存在）
+
+    按优先级查找：
+    1. 项目根目录的 .env
+    2. config 目录的 .env
+    """
+    # 获取项目根目录（假设 loader.py 在 trendradar/core/ 下）
+    current_file = Path(__file__)
+    project_root = current_file.parent.parent.parent
+    config_dir = project_root / "config"
+
+    # 按优先级尝试加载 .env 文件
+    env_files = [
+        project_root / ".env",
+        config_dir / ".env",
+    ]
+
+    for env_file in env_files:
+        if env_file.exists():
+            load_dotenv(env_file, override=True)
+            print(f"已加载环境变量文件: {env_file}")
+            break
 
 
 def _get_env_bool(key: str, default: bool = False) -> Optional[bool]:
@@ -255,6 +283,38 @@ def _load_webhook_config(config_data: Dict) -> Dict:
     }
 
 
+def _load_ai_config(config_data: Dict) -> Dict:
+    """加载 AI 服务配置"""
+    ai_config = config_data.get("ai", {})
+    summary_config = ai_config.get("summary", {})
+
+    # 环境变量覆盖
+    provider_env = _get_env_str("AI_PROVIDER")
+    api_key_env = _get_env_str("AI_API_KEY")
+    base_url_env = _get_env_str("AI_BASE_URL")
+    model_env = _get_env_str("AI_MODEL")
+    summary_enabled_env = _get_env_bool("AI_SUMMARY_ENABLED")
+
+    return {
+        "PROVIDER": provider_env or ai_config.get("provider", "anthropic"),
+        "API_KEY": api_key_env or ai_config.get("api_key", ""),
+        "BASE_URL": base_url_env or ai_config.get("base_url", ""),
+        "MODEL": model_env or ai_config.get("model", "claude-3-5-sonnet-20241022"),
+        "MAX_TOKENS": ai_config.get("max_tokens", 2000),
+        "TEMPERATURE": ai_config.get("temperature", 0.7),
+        "SUMMARY": {
+            "ENABLED": summary_enabled_env if summary_enabled_env is not None else summary_config.get("enabled", False),
+            "MODE": summary_config.get("mode", "daily"),
+            "GROUP_BY": summary_config.get("group_by", "keyword"),
+            "INCLUDE_URL": summary_config.get("include_url", True),
+            "MAX_NEWS_PER_KEYWORD": summary_config.get("max_news_per_keyword", 10),
+            "POSITION": summary_config.get("position", "top"),
+            "PROMPT_TEMPLATE": summary_config.get("prompt_template",
+                "请根据以下热点新闻数据生成每日摘要。按关键词分组，每组用 1-2 句话总结，最后列出相关链接。"),
+        },
+    }
+
+
 def _print_notification_sources(config: Dict) -> None:
     """打印通知渠道配置来源信息"""
     notification_sources = []
@@ -344,6 +404,9 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     Raises:
         FileNotFoundError: 配置文件不存在
     """
+    # 首先加载 .env 文件
+    _load_env_file()
+
     if config_path is None:
         config_path = os.environ.get("CONFIG_PATH", "config/config.yaml")
 
@@ -387,6 +450,9 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
 
     # Webhook 配置
     config.update(_load_webhook_config(config_data))
+
+    # AI 服务配置
+    config["AI"] = _load_ai_config(config_data)
 
     # 打印通知渠道配置来源
     _print_notification_sources(config)

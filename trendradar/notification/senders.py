@@ -75,6 +75,7 @@ def send_to_feishu(
     get_time_func: Callable = None,
     rss_items: Optional[list] = None,
     rss_new_items: Optional[list] = None,
+    ai_summary: Optional[str] = None,
 ) -> bool:
     """
     发送到飞书（支持分批发送，支持热榜+RSS合并）
@@ -93,6 +94,7 @@ def send_to_feishu(
         get_time_func: 获取当前时间的函数
         rss_items: RSS 统计条目列表（可选，用于合并推送）
         rss_new_items: RSS 新增条目列表（可选，用于新增区块）
+        ai_summary: AI 总结内容（可选）
 
     Returns:
         bool: 发送是否成功
@@ -115,6 +117,7 @@ def send_to_feishu(
         mode=mode,
         rss_items=rss_items,
         rss_new_items=rss_new_items,
+        ai_summary=ai_summary,
     )
 
     # 统一添加批次头部（已预留空间，不会超限）

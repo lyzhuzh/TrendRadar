@@ -1,0 +1,65 @@
+name: AI Daily Summary
+
+on:
+  schedule:
+    # 每天北京时间 22:30 运行（爬虫运行后30分钟）
+    - cron: "30 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  ai-summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-dotenv pytz PyYAML requests openai anthropic
+
+      - name: Run AI Summary
+        env:
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
+          AI_SUMMARY_ENABLED: "true"
+        run: |
+          python scripts/generate_ai_summary.py
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ai-summary-${{ github.run_number }}
+          path: output/ai_summaries/*.md
+          retention-days: 30
+
+      - name: Send summary notification (optional)
+        if: success() && hashFiles('output/ai_summaries/*.md') != ''
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          SUMMARY_FILE=$(ls output/ai_summaries/*.md 2>/dev/null | head -1)
+          if [ -n "$SUMMARY_FILE" ]; then
+            echo "Sending AI summary to notification channels..."
+            # 这里可以调用通知脚本发送总结
+            # python scripts/send_notification.py "$SUMMARY_FILE"
+          fi

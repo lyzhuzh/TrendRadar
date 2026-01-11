@@ -180,6 +180,76 @@ async def get_trending_topics(
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
+@mcp.tool
+async def get_news_for_summary(
+    date_range: Optional[Union[Dict[str, str], str]] = None,
+    mode: str = "daily",
+    group_by: str = "keyword",
+    max_news_per_keyword: int = 10,
+    include_url: bool = False
+) -> str:
+    """
+    获取按关键词分组的新闻数据，用于 AI 生成每日摘要
+
+    **推荐用于 AI 总结场景**
+
+    Args:
+        date_range: 日期范围（可选，默认"今天"）
+            - 支持自然语言: "今天", "昨天", "本周"
+            - 支持日期: "2025-01-10"
+            - 支持范围: {"start": "2025-01-01", "end": "2025-01-07"}
+        mode: 报告模式
+            - "daily": 当日汇总模式（默认）
+            - "current": 当前榜单模式
+            - "incremental": 增量监控模式
+        group_by: 分组方式
+            - "keyword": 按关键词分组（默认，适合 AI 总结）
+            - "platform": 按平台分组
+        max_news_per_keyword: 每个关键词最多返回新闻数，默认10
+        include_url: 是否包含URL链接，默认False（节省token）
+
+    Returns:
+        JSON格式的分组新闻数据，按关键词组织：
+        {
+            "success": true,
+            "date": "2025-01-10",
+            "mode": "daily",
+            "group_by": "keyword",
+            "total_keywords": 5,
+            "total_news": 23,
+            "keyword_groups": [
+                {
+                    "keyword": "DeepSeek",
+                    "count": 8,
+                    "news": [
+                        {
+                            "title": "DeepSeek 发布新模型",
+                            "source_name": "知乎",
+                            "rank": 1,
+                            "is_new": true,
+                            "url": "..."  # 仅当 include_url=True
+                        }
+                    ]
+                }
+            ]
+        }
+
+    Examples:
+        - 获取今天的数据用于总结: get_news_for_summary()
+        - 包含链接方便引用: get_news_for_summary(include_url=True)
+        - 指定日期总结: get_news_for_summary(date_range="昨天")
+    """
+    tools = _get_tools()
+    result = tools['data'].get_news_for_summary(
+        date_range=date_range,
+        mode=mode,
+        group_by=group_by,
+        max_news_per_keyword=max_news_per_keyword,
+        include_url=include_url
+    )
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
 # ==================== RSS 数据查询工具 ====================
 
 @mcp.tool
@@ -1044,33 +1114,34 @@ def run_server(
     print("    1. get_latest_news        - 获取最新新闻")
     print("    2. get_news_by_date       - 按日期查询新闻（支持自然语言）")
     print("    3. get_trending_topics    - 获取趋势话题（支持自动提取）")
+    print("    4. get_news_for_summary   - 获取按关键词分组的新闻（AI总结专用）")
     print()
     print("    === RSS 数据查询 ===")
-    print("    4. get_latest_rss         - 获取最新 RSS 订阅数据")
-    print("    5. search_rss             - 搜索 RSS 数据")
-    print("    6. get_rss_feeds_status   - 获取 RSS 源状态")
+    print("    5. get_latest_rss         - 获取最新 RSS 订阅数据")
+    print("    6. search_rss             - 搜索 RSS 数据")
+    print("    7. get_rss_feeds_status   - 获取 RSS 源状态")
     print()
     print("    === 智能检索工具 ===")
-    print("    7. search_news            - 统一新闻搜索（关键词/模糊/实体）")
-    print("    8. find_related_news      - 相关新闻查找（支持历史数据）")
+    print("    8. search_news            - 统一新闻搜索（关键词/模糊/实体）")
+    print("    9. find_related_news      - 相关新闻查找（支持历史数据）")
     print()
     print("    === 高级数据分析 ===")
-    print("    9. analyze_topic_trend      - 统一话题趋势分析（热度/生命周期/爆火/预测）")
-    print("    10. analyze_data_insights   - 统一数据洞察分析（平台对比/活跃度/关键词共现）")
-    print("    11. analyze_sentiment       - 情感倾向分析")
-    print("    12. aggregate_news          - 跨平台新闻聚合去重")
-    print("    13. compare_periods         - 时期对比分析（周环比/月环比）")
-    print("    14. generate_summary_report - 每日/每周摘要生成")
+    print("    10. analyze_topic_trend      - 统一话题趋势分析（热度/生命周期/爆火/预测）")
+    print("    11. analyze_data_insights   - 统一数据洞察分析（平台对比/活跃度/关键词共现）")
+    print("    12. analyze_sentiment       - 情感倾向分析")
+    print("    13. aggregate_news          - 跨平台新闻聚合去重")
+    print("    14. compare_periods         - 时期对比分析（周环比/月环比）")
+    print("    15. generate_summary_report - 每日/每周摘要生成")
     print()
     print("    === 配置与系统管理 ===")
-    print("    15. get_current_config      - 获取当前系统配置")
-    print("    16. get_system_status       - 获取系统运行状态")
-    print("    17. trigger_crawl           - 手动触发爬取任务")
+    print("    16. get_current_config      - 获取当前系统配置")
+    print("    17. get_system_status       - 获取系统运行状态")
+    print("    18. trigger_crawl           - 手动触发爬取任务")
     print()
     print("    === 存储同步工具 ===")
-    print("    18. sync_from_remote        - 从远程存储拉取数据到本地")
-    print("    19. get_storage_status      - 获取存储配置和状态")
-    print("    20. list_available_dates    - 列出本地/远程可用日期")
+    print("    19. sync_from_remote        - 从远程存储拉取数据到本地")
+    print("    20. get_storage_status      - 获取存储配置和状态")
+    print("    21. list_available_dates    - 列出本地/远程可用日期")
     print("=" * 60)
     print()
 

@@ -11,6 +11,30 @@ from typing import Dict, Optional, Callable
 from trendradar.report.formatter import format_title_for_platform
 
 
+def render_ai_summary_section(
+    ai_summary: str,
+    separator: str = "━━━━━━━━━━━━"
+) -> str:
+    """渲染 AI 总结区块
+
+    Args:
+        ai_summary: AI 生成的总结文本 (Markdown 格式)
+        separator: 分隔符
+
+    Returns:
+        格式化的 AI 总结内容
+    """
+    if not ai_summary:
+        return ""
+
+    content = f"{separator}\n\n"
+    content += "🤖 **AI 每日摘要**\n\n"
+    content += ai_summary
+    content += "\n"
+
+    return content
+
+
 def render_feishu_content(
     report_data: Dict,
     update_info: Optional[Dict] = None,
@@ -19,6 +43,7 @@ def render_feishu_content(
     reverse_content_order: bool = False,
     get_time_func: Optional[Callable[[], datetime]] = None,
     rss_items: Optional[list] = None,
+    ai_summary: Optional[str] = None,
 ) -> str:
     """渲染飞书通知内容（支持热榜+RSS合并）
 
@@ -30,6 +55,7 @@ def render_feishu_content(
         reverse_content_order: 是否反转内容顺序（新增在前）
         get_time_func: 获取当前时间的函数（可选，默认使用 datetime.now()）
         rss_items: RSS 条目列表（可选，用于合并推送）
+        ai_summary: AI 总结内容（可选）
 
     Returns:
         格式化的飞书消息内容
@@ -88,8 +114,16 @@ def render_feishu_content(
 
             new_titles_content += "\n"
 
+    # 根据 AI 总结配置决定位置
+    ai_summary_section = render_ai_summary_section(ai_summary, separator) if ai_summary else ""
+
     # 根据配置决定内容顺序
     text_content = ""
+
+    # AI 总结放在开头（如果 ai_summary_position == "top"）
+    if ai_summary_section:
+        text_content += ai_summary_section
+
     if reverse_content_order:
         # 新增热点在前，热点词汇统计在后
         if new_titles_content:
@@ -150,6 +184,7 @@ def render_dingtalk_content(
     reverse_content_order: bool = False,
     get_time_func: Optional[Callable[[], datetime]] = None,
     rss_items: Optional[list] = None,
+    ai_summary: Optional[str] = None,
 ) -> str:
     """渲染钉钉通知内容（支持热榜+RSS合并）
 
@@ -160,6 +195,7 @@ def render_dingtalk_content(
         reverse_content_order: 是否反转内容顺序（新增在前）
         get_time_func: 获取当前时间的函数（可选，默认使用 datetime.now()）
         rss_items: RSS 条目列表（可选，用于合并推送）
+        ai_summary: AI 总结内容（可选）
 
     Returns:
         格式化的钉钉消息内容
@@ -227,8 +263,16 @@ def render_dingtalk_content(
 
             new_titles_content += "\n"
 
+    # 根据 AI 总结配置决定位置
+    ai_summary_section = render_ai_summary_section(ai_summary, "---") if ai_summary else ""
+
     # 根据配置决定内容顺序
     text_content = header_content
+
+    # AI 总结放在开头（如果 ai_summary_position == "top"）
+    if ai_summary_section:
+        text_content += ai_summary_section
+
     if reverse_content_order:
         # 新增热点在前，热点词汇统计在后
         if new_titles_content:

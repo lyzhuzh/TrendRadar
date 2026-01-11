@@ -245,7 +245,36 @@ storage:
 
 
 # ===============================================================
-# 7. 高级设置（一般无需修改）
+# 7. AI 服务配置
+# ===============================================================
+ai:
+  # AI 服务商选择
+  provider: "anthropic"         # 可选: anthropic | openai | deepseek | qwen | zhipu
+
+  # API 配置（建议使用环境变量）
+  api_key: ""                   # API 密钥（或使用环境变量 AI_API_KEY）
+  base_url: ""                  # API 端点（可选，用于代理或兼容服务）
+
+  # 模型配置
+  model: "claude-3-5-sonnet-20241022"  # 默认模型
+  max_tokens: 2000              # 最大 token 数
+  temperature: 0.7              # 温度参数
+
+  # 总结配置（用于定时推送）
+  summary:
+    enabled: false              # 是否启用 AI 总结（默认禁用）
+    mode: "daily"               # 报告模式: daily | current | incremental
+    group_by: "keyword"         # 分组方式: keyword | platform
+    include_url: true           # 是否包含链接
+    max_news_per_keyword: 10    # 每个关键词最多返回新闻数
+    position: "top"             # 位置: top | bottom
+    prompt_template: |          # 自定义提示词模板（可选）
+      请根据以下热点新闻数据生成每日摘要。
+      按关键词分组，每组用 1-2 句话总结，最后列出相关链接。
+
+
+# ===============================================================
+# 8. 高级设置（一般无需修改）
 # ===============================================================
 advanced:
   # 版本检查

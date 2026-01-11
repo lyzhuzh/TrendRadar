@@ -234,6 +234,45 @@ class NewsAnalyzer:
             )
             return has_matched_news or has_new_news
 
+    def _generate_ai_summary(
+        self,
+        rss_items: Optional[List[Dict]] = None,
+    ) -> Optional[str]:
+        """
+        生成 AI 总结
+
+        注意：当前版本返回占位符提示
+        实际使用时需要通过 MCP 客户端调用 get_news_for_summary 工具获取数据，
+        然后让 Claude 为您生成个性化摘要。
+
+        Returns:
+            AI 总结文本，如果未启用则返回 None
+        """
+        ai_config = self.ctx.config.get("AI", {})
+        summary_config = ai_config.get("SUMMARY", {})
+
+        if not summary_config.get("ENABLED", False):
+            return None
+
+        # 返回提示信息，实际总结由 MCP 客户端完成
+        # 用户可以通过 MCP 客户端（如 Claude Desktop）调用 get_news_for_summary 工具
+        return """
+💡 **提示**：AI 总结功能已启用
+
+请使用 MCP 客户端调用 `get_news_for_summary` 工具获取分组新闻数据，
+然后让 Claude 为您生成个性化摘要。
+
+示例调用方式：
+```
+get_news_for_summary({
+    "mode": "daily",
+    "group_by": "keyword",
+    "max_news_per_keyword": 10,
+    "include_url": true
+})
+```
+"""
+
     def _load_analysis_data(
         self,
         quiet: bool = False,
@@ -361,8 +400,9 @@ class NewsAnalyzer:
         html_file_path: Optional[str] = None,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
-        """统一的通知发送逻辑，包含所有判断条件，支持热榜+RSS合并推送"""
+        """统一的通知发送逻辑，包含所有判断条件，支持热榜+RSS合并推送+AI总结"""
         has_notification = self._has_notification_configured()
         cfg = self.ctx.config
 
@@ -386,6 +426,8 @@ class NewsAnalyzer:
                 content_parts.append(f"热榜 {news_count} 条")
             if rss_count > 0:
                 content_parts.append(f"RSS {rss_count} 条")
+            if ai_summary:
+                content_parts.append("AI 总结")
             total_count = news_count + rss_count
             print(f"[推送] 准备发送：{' + '.join(content_parts)}，合计 {total_count} 条")
 
@@ -415,7 +457,7 @@ class NewsAnalyzer:
             # 是否发送版本更新信息
             update_info_to_send = self.update_info if cfg["SHOW_VERSION_UPDATE"] else None
 
-            # 使用 NotificationDispatcher 发送到所有渠道（合并热榜+RSS）
+            # 使用 NotificationDispatcher 发送到所有渠道（合并热榜+RSS+AI总结）
             dispatcher = self.ctx.create_notification_dispatcher()
             results = dispatcher.dispatch_all(
                 report_data=report_data,
@@ -426,6 +468,7 @@ class NewsAnalyzer:
                 html_file_path=html_file_path,
                 rss_items=rss_items,
                 rss_new_items=rss_new_items,
+                ai_summary=ai_summary,
             )
 
             if not results:
@@ -444,7 +487,7 @@ class NewsAnalyzer:
             return True
 
         elif cfg["ENABLE_NOTIFICATION"] and not has_notification:
-            print("⚠️ 警告：通知功能已启用但未配置任何通知渠道，将跳过通知发送")
+            print("[WARNING] Notification enabled but no channels configured")
         elif not cfg["ENABLE_NOTIFICATION"]:
             print(f"跳过{report_type}通知：通知功能已禁用")
         elif (
@@ -512,7 +555,10 @@ class NewsAnalyzer:
         if html_file:
             print(f"{summary_type}报告已生成: {html_file}")
 
-        # 发送通知（合并RSS）
+        # 生成 AI 总结（如果启用）
+        ai_summary = self._generate_ai_summary(rss_items=rss_items)
+
+        # 发送通知（合并RSS+AI总结）
         self._send_notification_if_needed(
             stats,
             mode_strategy["summary_report_type"],
@@ -523,6 +569,7 @@ class NewsAnalyzer:
             html_file_path=html_file,
             rss_items=rss_items,
             rss_new_items=rss_new_items,
+            ai_summary=ai_summary,
         )
 
         return html_file
@@ -1040,9 +1087,11 @@ class NewsAnalyzer:
                 if html_file:
                     print(f"HTML报告已生成: {html_file}")
 
-                # 发送实时通知（使用完整历史数据的统计结果，合并RSS）
+                # 发送实时通知（使用完整历史数据的统计结果，合并RSS+AI总结）
                 summary_html = None
                 if mode_strategy["should_send_realtime"]:
+                    # 生成 AI 总结（如果启用）
+                    ai_summary = self._generate_ai_summary(rss_items=rss_items)
                     self._send_notification_if_needed(
                         stats,
                         mode_strategy["realtime_report_type"],
@@ -1053,9 +1102,10 @@ class NewsAnalyzer:
                         html_file_path=html_file,
                         rss_items=rss_items,
                         rss_new_items=rss_new_items,
+                        ai_summary=ai_summary,
                     )
             else:
-                print("❌ 严重错误：无法读取刚保存的数据文件")
+                print("[ERROR] Cannot read data file after saving")
                 raise RuntimeError("数据一致性检查失败：保存后立即读取失败")
         else:
             title_info = self._prepare_current_title_info(results, time_info)
@@ -1075,9 +1125,11 @@ class NewsAnalyzer:
             if html_file:
                 print(f"HTML报告已生成: {html_file}")
 
-            # 发送实时通知（如果需要，合并RSS）
+            # 发送实时通知（如果需要，合并RSS+AI总结）
             summary_html = None
             if mode_strategy["should_send_realtime"]:
+                # 生成 AI 总结（如果启用）
+                ai_summary = self._generate_ai_summary(rss_items=rss_items)
                 self._send_notification_if_needed(
                     stats,
                     mode_strategy["realtime_report_type"],
@@ -1088,6 +1140,7 @@ class NewsAnalyzer:
                     html_file_path=html_file,
                     rss_items=rss_items,
                     rss_new_items=rss_new_items,
+                    ai_summary=ai_summary,
                 )
 
         # 生成汇总报告（如果需要）
@@ -1157,13 +1210,13 @@ def main():
         analyzer = NewsAnalyzer()
         analyzer.run()
     except FileNotFoundError as e:
-        print(f"❌ 配置文件错误: {e}")
+        print(f"[ERROR] Config file error: {e}")
         print("\n请确保以下文件存在:")
         print("  • config/config.yaml")
         print("  • config/frequency_words.txt")
         print("\n参考项目文档进行正确配置")
     except Exception as e:
-        print(f"❌ 程序运行错误: {e}")
+        print(f"[ERROR] Program error: {e}")
         raise
 
 

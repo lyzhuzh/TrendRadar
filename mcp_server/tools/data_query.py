@@ -448,3 +448,202 @@ class DataQueryTools:
                 }
             }
 
+    def get_news_for_summary(
+        self,
+        date_range: Optional[Union[Dict, str]] = None,
+        mode: str = "daily",
+        group_by: str = "keyword",
+        max_news_per_keyword: int = 10,
+        include_url: bool = False
+    ) -> Dict:
+        """
+        获取按关键词分组的新闻数据，用于 AI 生成每日摘要
+
+        Args:
+            date_range: 日期范围（可选，默认"今天"）
+            mode: 报告模式 ("daily"|"current"|"incremental")
+            group_by: 分组方式 ("keyword"=按关键词, "platform"=按平台)
+            max_news_per_keyword: 每个关键词最多返回新闻数，默认10
+            include_url: 是否包含URL链接，默认False（节省token）
+
+        Returns:
+            按关键词分组的新闻数据字典
+
+        Example:
+            >>> tools = DataQueryTools()
+            >>> result = tools.get_news_for_summary(
+            ...     mode="daily",
+            ...     group_by="keyword",
+            ...     include_url=True
+            ... )
+            >>> print(result['total_keywords'])
+        """
+        import traceback
+        import sys
+
+        try:
+            from datetime import datetime
+
+            # 参数验证
+            valid_modes = ["daily", "current", "incremental"]
+            mode = validate_mode(mode, valid_modes, default="daily")
+
+            if group_by not in ["keyword", "platform"]:
+                group_by = "keyword"
+
+            if not isinstance(max_news_per_keyword, int) or max_news_per_keyword < 1:
+                max_news_per_keyword = 10
+
+            # 处理 date_range：默认今天
+            if date_range is None:
+                date_range = "今天"
+
+            # 确保 date_range 是字符串
+            if not isinstance(date_range, str):
+                date_range = str(date_range)
+
+            # 规范化 date_range
+            normalized_range = normalize_date_range(date_range)
+
+            # 处理 date_range：支持字符串或对象
+            if isinstance(normalized_range, dict):
+                date_str = normalized_range.get('start', '今天')
+            else:
+                date_str = normalized_range if isinstance(normalized_range, str) else "今天"
+
+            target_date = validate_date_query(date_str)
+
+            # 读取数据
+            all_titles, id_to_name, timestamps = self.data_service.parser.read_all_titles_for_date(
+                date=target_date,
+                platform_ids=None
+            )
+
+            if not all_titles:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "DATA_NOT_FOUND",
+                        "message": f"未找到 {date_str} 的新闻数据",
+                        "suggestion": "请确保爬虫已经运行并生成了数据"
+                    }
+                }
+
+            # 读取关键词配置
+            word_groups = self.data_service.parser.parse_frequency_words()
+
+            # 构建关键词到新闻的映射
+            keyword_to_news = {}
+            platform_to_news = {}
+
+            for platform_id, titles in all_titles.items():
+                platform_name = id_to_name.get(platform_id, platform_id)
+
+                for title, info in titles.items():
+                    rank = info["ranks"][0] if info["ranks"] else 0
+                    is_new = len(info.get("ranks", [])) == 1  # 只出现一次视为新增
+
+                    news_item = {
+                        "title": title,
+                        "source_name": platform_name,
+                        "rank": rank,
+                        "is_new": is_new
+                    }
+
+                    if include_url:
+                        news_item["url"] = info.get("url", "")
+                        news_item["mobile_url"] = info.get("mobileUrl", "")
+
+                    # 按平台分组
+                    if platform_id not in platform_to_news:
+                        platform_to_news[platform_id] = []
+                    platform_to_news[platform_id].append(news_item)
+
+                    # 按关键词分组
+                    for group in word_groups:
+                        all_words = []
+                        # 提取 required 词
+                        for word_dict in group.get("required", []):
+                            if isinstance(word_dict, dict):
+                                all_words.append(word_dict.get("word", ""))
+                            elif isinstance(word_dict, str):
+                                all_words.append(word_dict)
+                        # 提取 normal 词
+                        for word_dict in group.get("normal", []):
+                            if isinstance(word_dict, dict):
+                                all_words.append(word_dict.get("word", ""))
+                            elif isinstance(word_dict, str):
+                                all_words.append(word_dict)
+
+                        for word in all_words:
+                            if word and word in title:
+                                if word not in keyword_to_news:
+                                    keyword_to_news[word] = []
+                                keyword_to_news[word].append(news_item)
+
+            # 按 group_by 组织结果
+            if group_by == "keyword":
+                groups = []
+                for keyword, news_list in sorted(keyword_to_news.items(),
+                                                   key=lambda x: len(x[1]),
+                                                   reverse=True):
+                    # 按排名排序，限制数量
+                    news_list.sort(key=lambda x: x["rank"])
+                    limited_news = news_list[:max_news_per_keyword]
+
+                    groups.append({
+                        "keyword": keyword,
+                        "count": len(news_list),
+                        "news": limited_news
+                    })
+
+                return {
+                    "success": True,
+                    "date": target_date.strftime("%Y-%m-%d"),
+                    "mode": mode,
+                    "group_by": group_by,
+                    "total_keywords": len(groups),
+                    "total_news": sum(g["count"] for g in groups),
+                    "keyword_groups": groups
+                }
+
+            else:  # group_by == "platform"
+                groups = []
+                for platform_id, news_list in sorted(platform_to_news.items(),
+                                                      key=lambda x: len(x[1]),
+                                                      reverse=True):
+                    # 按排名排序，限制数量
+                    news_list.sort(key=lambda x: x["rank"])
+                    limited_news = news_list[:max_news_per_keyword]
+
+                    groups.append({
+                        "platform": platform_id,
+                        "platform_name": id_to_name.get(platform_id, platform_id),
+                        "count": len(news_list),
+                        "news": limited_news
+                    })
+
+                return {
+                    "success": True,
+                    "date": target_date.strftime("%Y-%m-%d"),
+                    "mode": mode,
+                    "group_by": group_by,
+                    "total_platforms": len(groups),
+                    "total_news": sum(g["count"] for g in groups),
+                    "platform_groups": groups
+                }
+
+        except MCPError as e:
+            return {
+                "success": False,
+                "error": e.to_dict()
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": str(e)
+                }
+            }
+

@@ -73,6 +73,7 @@ class NotificationDispatcher:
         html_file_path: Optional[str] = None,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> Dict[str, bool]:
         """
         分发通知到所有已配置的渠道（支持热榜+RSS合并推送）
@@ -86,6 +87,7 @@ class NotificationDispatcher:
             html_file_path: HTML 报告文件路径（邮件使用）
             rss_items: RSS 统计条目列表（用于 RSS 统计区块）
             rss_new_items: RSS 新增条目列表（用于 RSS 新增区块）
+            ai_summary: AI 总结内容（可选）
 
         Returns:
             Dict[str, bool]: 每个渠道的发送结果，key 为渠道名，value 为是否成功
@@ -95,43 +97,43 @@ class NotificationDispatcher:
         # 飞书
         if self.config.get("FEISHU_WEBHOOK_URL"):
             results["feishu"] = self._send_feishu(
-                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
+                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items, ai_summary
             )
 
         # 钉钉
         if self.config.get("DINGTALK_WEBHOOK_URL"):
             results["dingtalk"] = self._send_dingtalk(
-                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
+                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items, ai_summary
             )
 
         # 企业微信
         if self.config.get("WEWORK_WEBHOOK_URL"):
             results["wework"] = self._send_wework(
-                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
+                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items, ai_summary
             )
 
         # Telegram（需要配对验证）
         if self.config.get("TELEGRAM_BOT_TOKEN") and self.config.get("TELEGRAM_CHAT_ID"):
             results["telegram"] = self._send_telegram(
-                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
+                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items, ai_summary
             )
 
         # ntfy（需要配对验证）
         if self.config.get("NTFY_SERVER_URL") and self.config.get("NTFY_TOPIC"):
             results["ntfy"] = self._send_ntfy(
-                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
+                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items, ai_summary
             )
 
         # Bark
         if self.config.get("BARK_URL"):
             results["bark"] = self._send_bark(
-                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
+                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items, ai_summary
             )
 
         # Slack
         if self.config.get("SLACK_WEBHOOK_URL"):
             results["slack"] = self._send_slack(
-                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
+                report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items, ai_summary
             )
 
         # 邮件（保持原有逻辑，已支持多收件人）
@@ -187,6 +189,7 @@ class NotificationDispatcher:
         mode: str,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
         """发送到飞书（多账号，支持热榜+RSS合并）"""
         return self._send_to_multi_accounts(
@@ -206,6 +209,7 @@ class NotificationDispatcher:
                 get_time_func=self.get_time_func,
                 rss_items=rss_items,
                 rss_new_items=rss_new_items,
+                ai_summary=ai_summary,
             ),
         )
 
@@ -218,6 +222,7 @@ class NotificationDispatcher:
         mode: str,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
         """发送到钉钉（多账号，支持热榜+RSS合并）"""
         return self._send_to_multi_accounts(
@@ -236,6 +241,7 @@ class NotificationDispatcher:
                 split_content_func=self.split_content_func,
                 rss_items=rss_items,
                 rss_new_items=rss_new_items,
+                ai_summary=ai_summary,
             ),
         )
 
@@ -248,6 +254,7 @@ class NotificationDispatcher:
         mode: str,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
         """发送到企业微信（多账号，支持热榜+RSS合并）"""
         return self._send_to_multi_accounts(
@@ -267,6 +274,7 @@ class NotificationDispatcher:
                 split_content_func=self.split_content_func,
                 rss_items=rss_items,
                 rss_new_items=rss_new_items,
+                ai_summary=ai_summary,
             ),
         )
 
@@ -279,6 +287,7 @@ class NotificationDispatcher:
         mode: str,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
         """发送到 Telegram（多账号，需验证 token 和 chat_id 配对，支持热榜+RSS合并）"""
         telegram_tokens = parse_multi_account_config(self.config["TELEGRAM_BOT_TOKEN"])
@@ -320,6 +329,7 @@ class NotificationDispatcher:
                     split_content_func=self.split_content_func,
                     rss_items=rss_items,
                     rss_new_items=rss_new_items,
+                    ai_summary=ai_summary,
                 )
                 results.append(result)
 
@@ -334,6 +344,7 @@ class NotificationDispatcher:
         mode: str,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
         """发送到 ntfy（多账号，需验证 topic 和 token 配对，支持热榜+RSS合并）"""
         ntfy_server_url = self.config["NTFY_SERVER_URL"]
@@ -374,6 +385,7 @@ class NotificationDispatcher:
                     split_content_func=self.split_content_func,
                     rss_items=rss_items,
                     rss_new_items=rss_new_items,
+                    ai_summary=ai_summary,
                 )
                 results.append(result)
 
@@ -388,6 +400,7 @@ class NotificationDispatcher:
         mode: str,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
         """发送到 Bark（多账号，支持热榜+RSS合并）"""
         return self._send_to_multi_accounts(
@@ -406,6 +419,7 @@ class NotificationDispatcher:
                 split_content_func=self.split_content_func,
                 rss_items=rss_items,
                 rss_new_items=rss_new_items,
+                ai_summary=ai_summary,
             ),
         )
 
@@ -418,6 +432,7 @@ class NotificationDispatcher:
         mode: str,
         rss_items: Optional[List[Dict]] = None,
         rss_new_items: Optional[List[Dict]] = None,
+        ai_summary: Optional[str] = None,
     ) -> bool:
         """发送到 Slack（多账号，支持热榜+RSS合并）"""
         return self._send_to_multi_accounts(
@@ -436,6 +451,7 @@ class NotificationDispatcher:
                 split_content_func=self.split_content_func,
                 rss_items=rss_items,
                 rss_new_items=rss_new_items,
+                ai_summary=ai_summary,
             ),
         )
 
