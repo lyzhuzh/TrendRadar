@@ -58,12 +58,14 @@ def send_ai_notification(summary_file: str) -> bool:
     dispatcher = ctx.create_notification_dispatcher()
 
     # 准备空报告数据（AI 总结不需要其他数据）
+    # split_content_into_batches 需要特定的字段结构
     report_data = {
         "date": ctx.format_date(),
         "time": ctx.format_time(),
-        "stats": {},
-        "keywords": [],
-        "platforms": [],
+        "stats": [],  # 空统计数据
+        "new_titles": [],  # 空新增标题
+        "failed_ids": [],  # 空失败ID列表
+        "total_new_count": 0,  # 新增数量为0
     }
 
     # 发送通知（只发送 AI 总结）
