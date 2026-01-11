@@ -49,7 +49,6 @@ jobs:
           ctx = AppContext(config)
 
           # 检查今天是否有数据
-          from datetime import datetime
           today = ctx.format_date()
           db_path = Path(f'output/news/{today}.db')
 
@@ -57,11 +56,13 @@ jobs:
               print(f'[OK] Data found for {today}')
           else:
               print(f'[WARNING] No data found for {today}, running crawler first...')
-              from trendradar.crawler.fetcher import DataFetcher
-              fetcher = DataFetcher(config)
-              results = fetcher.fetch_all()
-              print(f'[OK] Crawled {len(results)} platforms')
+              exit(1)
           "
+
+      - name: Run crawler (if no data)
+        if: failure()
+        run: |
+          python -m trendradar
 
       - name: Run AI Summary
         env:
