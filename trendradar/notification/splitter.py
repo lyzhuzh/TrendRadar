@@ -175,6 +175,7 @@ def split_content_into_batches(
         not report_data["stats"]
         and not report_data["new_titles"]
         and not report_data["failed_ids"]
+        and not current_batch_has_content  # 检查是否已有内容（如 AI 总结）
     ):
         if mode == "incremental":
             mode_text = "增量模式下暂无新增匹配的热点词汇"
